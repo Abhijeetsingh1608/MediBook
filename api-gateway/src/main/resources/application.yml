@@ -1,0 +1,94 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      server:
+        webmvc:
+          routes:
+            - id: auth-service
+              uri: lb://AUTH-SERVICE
+              predicates:
+                - Path=/api/v1/auth/**,/oauth2/**,/login/**,/login
+            - id: provider-service
+              uri: lb://PROVIDER-SERVICE
+              predicates:
+                - Path=/api/v1/providers/**
+            - id: schedule-service
+              uri: lb://SCHEDULE-SERVICE
+              predicates:
+                - Path=/api/v1/slots/**
+            - id: appointment-service
+              uri: lb://APPOINTMENT-SERVICE
+              predicates:
+                - Path=/api/v1/appointments/**
+            - id: review-service
+              uri: lb://REVIEW-SERVICE
+              predicates:
+                - Path=/api/v1/reviews/**
+            - id: record-service
+              uri: lb://RECORD-SERVICE
+              predicates:
+                - Path=/api/v1/records/**
+            - id: notification-service
+              uri: lb://NOTIFICATION-SERVICE
+              predicates:
+                - Path=/api/v1/notifications/**
+            - id: payment-service
+              uri: lb://PAYMENT-SERVICE
+              predicates:
+                - Path=/api/v1/payments/**
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_DEFAULT_ZONE:http://localhost:8761/eureka}
+
+logging:
+  level:
+    org.springframework.cloud.gateway: TRACE
+    org.springframework.web.servlet: DEBUG
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+    urls:
+      - name: api-gateway
+        url: /v3/api-docs
+      - name: auth-service
+        url: /aggregate/auth/openapi
+      - name: provider-service
+        url: /aggregate/providers/openapi
+      - name: schedule-service
+        url: /aggregate/slots/openapi
+      - name: appointment-service
+        url: /aggregate/appointments/openapi
+      - name: review-service
+        url: /aggregate/reviews/openapi
+      - name: record-service
+        url: /aggregate/records/openapi
+      - name: notification-service
+        url: /aggregate/notifications/openapi
+      - name: payment-service
+        url: /aggregate/payments/openapi
+
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+  internal:
+    secret: ${INTERNAL_GATEWAY_SECRET}
+  swagger:
+    services:
+      auth: ${SWAGGER_AUTH_SERVICE_URL:http://localhost:8081}
+      providers: ${SWAGGER_PROVIDER_SERVICE_URL:http://localhost:8082}
+      slots: ${SWAGGER_SCHEDULE_SERVICE_URL:http://localhost:8083}
+      appointments: ${SWAGGER_APPOINTMENT_SERVICE_URL:http://localhost:8084}
+      reviews: ${SWAGGER_REVIEW_SERVICE_URL:http://localhost:8085}
+      records: ${SWAGGER_RECORD_SERVICE_URL:http://localhost:8086}
+      notifications: ${SWAGGER_NOTIFICATION_SERVICE_URL:http://localhost:8087}
+      payments: ${SWAGGER_PAYMENT_SERVICE_URL:http://localhost:8088}
