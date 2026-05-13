@@ -17,10 +17,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@Transactional
 /*
  * This is the actual implementation class for AuthServiceImpl.
  * All the real business logic is written here.
@@ -296,6 +298,20 @@ public class AuthServiceImpl implements AuthService {
         userRepository.save(user);
     }
 
+    @Override
+    public User activateUser(Long userId) {
+        User user = getUserById(userId);
+        user.setActive(true);
+        return userRepository.save(user);
+    }
+
+    @Override
+    public User updateUserRole(Long userId, UserRole role) {
+        User user = getUserById(userId);
+        user.setRole(role);
+        return userRepository.save(user);
+    }
+
     /*
      * This method is used to create and save new data.
      * It takes input, prepares the required object,
@@ -330,12 +346,21 @@ public class AuthServiceImpl implements AuthService {
             authOtpRepository.save(authOtp);
         }
 
-        if (purpose == AuthOtpPurpose.EMAIL_VERIFICATION) {
-            emailService.sendEmailVerificationOtp(user.getEmail(), user.getFullName(), otp);
-            return;
-        }
+        log.info("\n=======================================================\n" +
+                 "LOCAL DEV OTP: {} OTP for {} is: {}\n" +
+                 "=======================================================", purpose, user.getEmail(), otp);
 
-        emailService.sendLoginOtpEmail(user.getEmail(), user.getFullName(), otp);
+        try {
+            if (purpose == AuthOtpPurpose.EMAIL_VERIFICATION) {
+                emailService.sendEmailVerificationOtp(user.getEmail(), user.getFullName(), otp);
+                return;
+            }
+
+            emailService.sendLoginOtpEmail(user.getEmail(), user.getFullName(), otp);
+        } catch (Exception ex) {
+            log.warn("Failed to send {} OTP email to {} (but continuing for local testing). Error: {}", purpose, user.getEmail(), ex.getMessage());
+            // throw new RuntimeException("Unable to send OTP email right now. Please try again in a moment.");
+        }
     }
 
     /*

@@ -2,7 +2,7 @@ spring:
   application:
     name: record-service
   datasource:
-    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/medibook_record?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${RECORD_DB_NAME:medibook_record}?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC
     username: ${MYSQL_USERNAME}
     password: ${MYSQL_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -22,10 +22,19 @@ eureka:
   client:
     service-url:
       defaultZone: ${EUREKA_DEFAULT_ZONE:http://localhost:8761/eureka}
+  instance:
+    hostname: localhost
+    prefer-ip-address: false
+    non-secure-port: ${server.port}
+    instance-id: ${spring.application.name}:localhost:${server.port}
 
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
+
+logging:
+  file:
+    name: ${LOG_FILE:../logs/${spring.application.name}.log}
 
 management:
   endpoints:

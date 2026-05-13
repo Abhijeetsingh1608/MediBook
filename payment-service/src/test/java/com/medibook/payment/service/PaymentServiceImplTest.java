@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -255,6 +256,18 @@ class PaymentServiceImplTest {
     }
 
     @Test
+    @DisplayName("refundPayment: success for admin on paid payment")
+    void refundPayment_success() {
+        pendingPayment.setStatus(PaymentStatus.PAID);
+        when(paymentRepository.findById(100L)).thenReturn(java.util.Optional.of(pendingPayment));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Payment result = paymentService.refundPayment(100L, "ADMIN");
+
+        assertThat(result.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
+    }
+
+    @Test
     @DisplayName("getPaymentsByPatient: throws when patient tries to access another user's payments")
     void getPaymentsByPatient_nonOwner_throwsException() {
         assertThatThrownBy(() -> paymentService.getPaymentsByPatient(5L, 2L, "PATIENT"))
@@ -294,6 +307,51 @@ class PaymentServiceImplTest {
         assertThat(result.get(0).getProviderId()).isEqualTo(3L);
     }
 
+    @Test
+    @DisplayName("generateInvoicePdf: success")
+    void generateInvoicePdf_success() {
+        when(paymentRepository.findById(100L)).thenReturn(java.util.Optional.of(pendingPayment));
+
+        byte[] result = paymentService.generateInvoicePdf(100L, 2L, "PATIENT");
+
+        assertThat(result).isNotEmpty();
+    }
+
+    @Test
+    @DisplayName("verifyPayment: returns existing PAID payment immediately")
+    void verifyPayment_alreadyPaid_returnsPayment() {
+        pendingPayment.setStatus(PaymentStatus.PAID);
+        VerifyPaymentRequest request = VerifyPaymentRequest.builder()
+                .razorpayOrderId("order_test_1")
+                .build();
+        when(paymentRepository.findByRazorpayOrderId("order_test_1")).thenReturn(java.util.Optional.of(pendingPayment));
+
+        Payment result = paymentService.verifyPayment(request, 2L, "PATIENT");
+
+        assertThat(result.getStatus()).isEqualTo(PaymentStatus.PAID);
+        verify(paymentRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("activatePaidAppointment: throws exception if client fails")
+    void verifyPayment_activationFailure_throwsException() {
+        String keySecret = "razorpay-secret-key-123456789012345";
+        VerifyPaymentRequest request = VerifyPaymentRequest.builder()
+                .razorpayOrderId("order_test_1")
+                .razorpayPaymentId("pay_test_1")
+                .razorpaySignature(buildSignature("order_test_1|pay_test_1", keySecret))
+                .build();
+
+        when(paymentRepository.findByRazorpayOrderId("order_test_1")).thenReturn(java.util.Optional.of(pendingPayment));
+        when(razorpayClient.getKeySecret()).thenReturn(keySecret);
+        when(paymentRepository.save(any(Payment.class))).thenReturn(pendingPayment);
+        doThrow(new RuntimeException("API Down")).when(appointmentClient).activatePaidAppointment(1L);
+
+        assertThatThrownBy(() -> paymentService.verifyPayment(request, 2L, "PATIENT"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("activation failed");
+    }
+
     private String buildSignature(String payload, String secret) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
@@ -304,5 +362,123 @@ class PaymentServiceImplTest {
         } catch (NoSuchAlgorithmException | InvalidKeyException ex) {
             throw new IllegalStateException("Unable to build test signature", ex);
         }
+    }
+    @Test
+    void createPaymentOrder_appointmentNotFound_throwsException() {
+        CreatePaymentOrderRequest request = CreatePaymentOrderRequest.builder().appointmentId(1L).build();
+        when(appointmentClient.getAppointmentById(1L)).thenReturn(null);
+        assertThatThrownBy(() -> paymentService.createPaymentOrder(request, 2L, "PATIENT"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Appointment not found");
+    }
+
+    @Test
+    void createPaymentOrder_unauthorizedPatient_throwsException() {
+        CreatePaymentOrderRequest request = CreatePaymentOrderRequest.builder().appointmentId(1L).build();
+        activeAppointment.setPatientUserId(99L);
+        when(appointmentClient.getAppointmentById(1L)).thenReturn(activeAppointment);
+        assertThatThrownBy(() -> paymentService.createPaymentOrder(request, 2L, "PATIENT"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("only for your own appointment");
+    }
+
+    @Test
+    void verifyPayment_orderNotFound_throwsException() {
+        VerifyPaymentRequest request = VerifyPaymentRequest.builder().razorpayOrderId("order_not_found").build();
+        when(paymentRepository.findByRazorpayOrderId("order_not_found")).thenReturn(java.util.Optional.empty());
+        assertThatThrownBy(() -> paymentService.verifyPayment(request, 2L, "PATIENT"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("order not found");
+    }
+
+    @Test
+    @DisplayName("createPaymentOrder: throws when Razorpay returns null order")
+    void createPaymentOrder_razorpayNullOrder_throwsException() {
+        CreatePaymentOrderRequest request = CreatePaymentOrderRequest.builder().appointmentId(1L).amount(BigDecimal.valueOf(500)).build();
+        when(appointmentClient.getAppointmentById(1L)).thenReturn(activeAppointment);
+        when(razorpayClient.createOrder(any(), any(), any())).thenReturn(null);
+
+        assertThatThrownBy(() -> paymentService.createPaymentOrder(request, 2L, "PATIENT"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Unable to create Razorpay order");
+    }
+
+    @Test
+    @DisplayName("verifyPayment: returns existing FAILED payment immediately")
+    void verifyPayment_alreadyFailed_returnsPayment() {
+        pendingPayment.setStatus(PaymentStatus.FAILED);
+        VerifyPaymentRequest request = VerifyPaymentRequest.builder().razorpayOrderId("order_test_1").build();
+        when(paymentRepository.findByRazorpayOrderId("order_test_1")).thenReturn(java.util.Optional.of(pendingPayment));
+
+        Payment result = paymentService.verifyPayment(request, 2L, "PATIENT");
+        assertThat(result.getStatus()).isEqualTo(PaymentStatus.FAILED);
+    }
+
+    @Test
+    @DisplayName("markPaymentFailed: returns existing FAILED payment immediately")
+    void markPaymentFailed_alreadyFailed_returnsPayment() {
+        pendingPayment.setStatus(PaymentStatus.FAILED);
+        when(paymentRepository.findById(100L)).thenReturn(java.util.Optional.of(pendingPayment));
+
+        Payment result = paymentService.markPaymentFailed(100L, 2L, "PATIENT");
+        assertThat(result.getStatus()).isEqualTo(PaymentStatus.FAILED);
+    }
+
+    @Test
+    @DisplayName("refundPayment: throws when payment is not PAID")
+    void refundPayment_notPaid_throwsException() {
+        when(paymentRepository.findById(100L)).thenReturn(java.util.Optional.of(pendingPayment));
+        assertThatThrownBy(() -> paymentService.refundPayment(100L, "ADMIN"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Only paid payments can be refunded");
+    }
+
+    @Test
+    @DisplayName("getAllPayments: throws when role is not ADMIN")
+    void getAllPayments_nonAdmin_throwsException() {
+        assertThatThrownBy(() -> paymentService.getAllPayments("PATIENT"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Only admin can view all payments");
+    }
+
+    @Test
+    @DisplayName("getPaymentsByPatient: success for ADMIN role")
+    void getPaymentsByPatient_admin_success() {
+        when(paymentRepository.findByPatientUserIdOrderByCreatedAtDesc(9L)).thenReturn(List.of(pendingPayment));
+        List<Payment> result = paymentService.getPaymentsByPatient(9L, 1L, "ADMIN");
+        assertThat(result).isNotEmpty();
+    }
+
+    @Test
+    @DisplayName("validateOwnerOrAdmin: throws when loggedInUserId is null")
+    void getPaymentById_nullUserId_throwsException() {
+        when(paymentRepository.findById(100L)).thenReturn(java.util.Optional.of(pendingPayment));
+        assertThatThrownBy(() -> paymentService.getPaymentById(100L, null, "PATIENT"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("access only your own payments");
+    }
+
+    @Test
+    @DisplayName("publishPaymentFailedEvent: handles appointment client failure")
+    void markPaymentFailed_appointmentClientFailure_success() {
+        when(paymentRepository.findById(100L)).thenReturn(java.util.Optional.of(pendingPayment));
+        when(paymentRepository.save(any())).thenReturn(pendingPayment);
+        when(appointmentClient.getAppointmentById(1L)).thenThrow(new RuntimeException("API Down"));
+
+        Payment result = paymentService.markPaymentFailed(100L, 2L, "PATIENT");
+        assertThat(result.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        verify(paymentEventPublisher).publishPaymentFailed(argThat(event -> event.getAppointmentDate() == null));
+    }
+
+    @Test
+    @DisplayName("generateInvoicePdf: throws runtime exception on error")
+    void generateInvoicePdf_failure_throwsException() {
+        // This is hard to trigger with real Document/PdfWriter without a lot of mocking, 
+        // but we can mock findById to return something that might break or just check the code.
+        // Actually, the try-with-resources and PDF generation is quite robust unless memory runs out.
+        // I'll add a test that ensures it throws if findById fails.
+        when(paymentRepository.findById(100L)).thenReturn(java.util.Optional.empty());
+        assertThatThrownBy(() -> paymentService.generateInvoicePdf(100L, 2L, "PATIENT"))
+                .isInstanceOf(RuntimeException.class);
     }
 }

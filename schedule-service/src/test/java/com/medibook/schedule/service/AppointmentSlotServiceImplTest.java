@@ -135,4 +135,90 @@ class AppointmentSlotServiceImplTest {
 
         assertThat(result.getStatus()).isEqualTo(SlotStatus.BOOKED);
     }
+
+    @Test
+    void getAllSlots_success() {
+        when(slotRepository.findAll()).thenReturn(List.of(AppointmentSlot.builder().slotId(1L).build()));
+        List<AppointmentSlot> result = slotService.getAllSlots();
+        assertThat(result).hasSize(1);
+    }
+
+    @Test
+    void getSlotById_success() {
+        AppointmentSlot slot = AppointmentSlot.builder().slotId(1L).build();
+        when(slotRepository.findById(1L)).thenReturn(Optional.of(slot));
+        AppointmentSlot result = slotService.getSlotById(1L);
+        assertThat(result.getSlotId()).isEqualTo(1L);
+    }
+
+    @Test
+    void getSlotById_notFound_throwsException() {
+        when(slotRepository.findById(1L)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> slotService.getSlotById(1L))
+                .isInstanceOf(RuntimeException.class);
+    }
+
+    @Test
+    void getSlotsByProvider_success() {
+        when(slotRepository.findByProviderId(1L)).thenReturn(List.of(AppointmentSlot.builder().slotId(1L).build()));
+        List<AppointmentSlot> result = slotService.getSlotsByProvider(1L);
+        assertThat(result).hasSize(1);
+    }
+
+    @Test
+    void getSlotsByProviderAndDate_success() {
+        LocalDate date = LocalDate.now();
+        when(slotRepository.findByProviderIdAndSlotDate(1L, date)).thenReturn(List.of(AppointmentSlot.builder().slotId(1L).build()));
+        List<AppointmentSlot> result = slotService.getSlotsByProviderAndDate(1L, date);
+        assertThat(result).hasSize(1);
+    }
+
+    @Test
+    void updateSlot_success() {
+        AppointmentSlot existing = AppointmentSlot.builder().slotId(1L).build();
+        when(slotRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(slotRepository.save(any(AppointmentSlot.class))).thenAnswer(i -> i.getArgument(0));
+
+        SlotRequest request = SlotRequest.builder()
+                .providerId(1L)
+                .slotDate(LocalDate.now().plusDays(2))
+                .startTime(LocalTime.of(14, 0))
+                .endTime(LocalTime.of(15, 0))
+                .build();
+
+        AppointmentSlot result = slotService.updateSlot(1L, request);
+        assertThat(result.getSlotDate()).isEqualTo(request.getSlotDate());
+    }
+
+    @Test
+    void deleteSlot_success() {
+        AppointmentSlot slot = AppointmentSlot.builder().slotId(1L).build();
+        when(slotRepository.findById(1L)).thenReturn(Optional.of(slot));
+        slotService.deleteSlot(1L);
+        verify(slotRepository).delete(slot);
+    }
+
+    @Test
+    void createSlot_unauthorizedProvider_throwsException() {
+        when(providerClient.getProviderById(1L)).thenReturn(providerSummary);
+        assertThatThrownBy(() -> slotService.createSlot(sampleRequest, 99L, "PROVIDER"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("your own provider profile");
+    }
+
+    @Test
+    void createSlot_invalidTimeRange_throwsException() {
+        sampleRequest.setEndTime(sampleRequest.getStartTime().minusMinutes(1));
+        assertThatThrownBy(() -> slotService.createSlot(sampleRequest, 10L, "PROVIDER"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("after start time");
+    }
+
+    @Test
+    void createSlot_pastDate_throwsException() {
+        sampleRequest.setSlotDate(LocalDate.now().minusDays(1));
+        assertThatThrownBy(() -> slotService.createSlot(sampleRequest, 10L, "PROVIDER"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Past date slots");
+    }
 }

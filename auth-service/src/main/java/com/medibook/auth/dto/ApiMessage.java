@@ -15,4 +15,5 @@ import lombok.NoArgsConstructor;
  */
 public class ApiMessage {
     private String message;
+    private Boolean otpSent;
 }

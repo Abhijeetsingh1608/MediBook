@@ -111,4 +111,34 @@ class NotificationServiceImplTest {
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("own notifications");
     }
+
+    @Test
+    void getAllNotifications_success() {
+        when(notificationRepository.findAll()).thenReturn(java.util.List.of(new NotificationRecord()));
+        java.util.List<NotificationRecord> result = notificationService.getAllNotifications();
+        assertThat(result).hasSize(1);
+    }
+
+    @Test
+    void getNotificationsByUser_success() {
+        when(notificationRepository.findByUserIdOrderByCreatedAtDesc(1L)).thenReturn(java.util.List.of(new NotificationRecord()));
+        java.util.List<NotificationRecord> result = notificationService.getNotificationsByUser(1L, 1L, "PATIENT");
+        assertThat(result).hasSize(1);
+    }
+
+    @Test
+    void markAsRead_success() {
+        NotificationRecord record = NotificationRecord.builder()
+                .notificationId(1L)
+                .userId(1L)
+                .readStatus(false)
+                .build();
+        when(notificationRepository.findById(1L)).thenReturn(Optional.of(record));
+        when(notificationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        NotificationRecord result = notificationService.markAsRead(1L, 1L, "PATIENT");
+
+        assertThat(result.isReadStatus()).isTrue();
+        assertThat(result.getReadAt()).isNotNull();
+    }
 }

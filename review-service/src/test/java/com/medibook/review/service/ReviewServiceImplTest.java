@@ -3,6 +3,7 @@ package com.medibook.review.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -12,10 +13,8 @@ import com.medibook.review.dto.AppointmentResponse;
 import com.medibook.review.dto.ReviewRequest;
 import com.medibook.review.entity.Review;
 import com.medibook.review.repository.ReviewRepository;
-import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -37,89 +36,127 @@ class ReviewServiceImplTest {
     @InjectMocks
     private ReviewServiceImpl reviewService;
 
-    private ReviewRequest reviewRequest;
-    private AppointmentResponse completedAppointment;
+    private ReviewRequest request;
 
     @BeforeEach
     void setUp() {
-        reviewRequest = ReviewRequest.builder()
-                .appointmentId(1L)
-                .providerId(3L)
-                .rating(5)
-                .comment("Very helpful")
-                .build();
-
-        completedAppointment = new AppointmentResponse(
-                1L,
-                9L,
-                3L,
-                7L,
-                "COMPLETED");
+        request = new ReviewRequest();
+        request.setAppointmentId(1L);
+        request.setProviderId(2L);
+        request.setRating(5);
+        request.setComment("Great!");
     }
 
     @Test
-    @DisplayName("createReview: success - saves review and updates provider rating")
     void createReview_success() {
         when(reviewRepository.existsByAppointmentId(1L)).thenReturn(false);
-        when(appointmentClient.getAppointmentById(1L)).thenReturn(completedAppointment);
-        when(reviewRepository.save(any(Review.class))).thenAnswer(invocation -> {
-            Review review = invocation.getArgument(0);
-            review.setReviewId(1L);
-            return review;
-        });
-        when(reviewRepository.calculateAverageRating(3L)).thenReturn(4.5);
+        AppointmentResponse appointment = new AppointmentResponse();
+        appointment.setPatientUserId(10L);
+        appointment.setProviderId(2L);
+        appointment.setStatus("COMPLETED");
+        when(appointmentClient.getAppointmentById(1L)).thenReturn(appointment);
+        when(reviewRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(reviewRepository.calculateAverageRating(2L)).thenReturn(5.0);
 
-        Review result = reviewService.createReview(reviewRequest, 9L);
-
+        Review result = reviewService.createReview(request, 10L);
         assertThat(result.getRating()).isEqualTo(5);
-        verify(providerClient).updateProviderRating(3L, 4.5);
+        verify(providerClient).updateProviderRating(2L, 5.0);
     }
 
     @Test
-    @DisplayName("createReview: throws when review already exists for appointment")
-    void createReview_duplicate_throwsException() {
+    void createReview_alreadyExists_throwsException() {
         when(reviewRepository.existsByAppointmentId(1L)).thenReturn(true);
-
-        assertThatThrownBy(() -> reviewService.createReview(reviewRequest, 9L))
+        assertThatThrownBy(() -> reviewService.createReview(request, 10L))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("already exists");
+                .hasMessageContaining("Review already exists");
     }
 
     @Test
-    @DisplayName("updateReview: throws when patient is not owner")
+    void createReview_notCompleted_throwsException() {
+        when(reviewRepository.existsByAppointmentId(1L)).thenReturn(false);
+        AppointmentResponse appointment = new AppointmentResponse();
+        appointment.setPatientUserId(10L);
+        appointment.setProviderId(2L);
+        appointment.setStatus("BOOKED");
+        when(appointmentClient.getAppointmentById(1L)).thenReturn(appointment);
+
+        assertThatThrownBy(() -> reviewService.createReview(request, 10L))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Only completed appointments");
+    }
+
+    @Test
+    void getReviewById_notFound_throwsException() {
+        when(reviewRepository.findById(1L)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> reviewService.getReviewById(1L))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Review not found");
+    }
+
+    @Test
     void updateReview_unauthorized_throwsException() {
-        Review existing = Review.builder()
-                .reviewId(1L)
-                .appointmentId(1L)
-                .patientUserId(9L)
-                .providerId(3L)
-                .rating(4)
-                .comment("Old")
-                .build();
-        when(reviewRepository.findById(1L)).thenReturn(Optional.of(existing));
-
-        assertThatThrownBy(() -> reviewService.updateReview(1L, reviewRequest, 99L))
+        Review review = Review.builder().patientUserId(20L).build();
+        when(reviewRepository.findById(1L)).thenReturn(Optional.of(review));
+        assertThatThrownBy(() -> reviewService.updateReview(1L, request, 10L))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("not allowed");
+                .hasMessageContaining("not allowed to update");
     }
 
     @Test
-    @DisplayName("deleteReview: admin can delete and rating is recalculated")
+    void createReview_invalidRating_throwsException() {
+        request.setRating(6);
+        assertThatThrownBy(() -> reviewService.createReview(request, 10L))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Rating must be between 1 and 5");
+    }
+
+    @Test
+    void createReview_wrongPatient_throwsException() {
+        when(reviewRepository.existsByAppointmentId(1L)).thenReturn(false);
+        AppointmentResponse appointment = new AppointmentResponse();
+        appointment.setPatientUserId(20L); // Not 10L
+        when(appointmentClient.getAppointmentById(1L)).thenReturn(appointment);
+
+        assertThatThrownBy(() -> reviewService.createReview(request, 10L))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("only your own appointment");
+    }
+
+    @Test
+    void createReview_wrongProvider_throwsException() {
+        when(reviewRepository.existsByAppointmentId(1L)).thenReturn(false);
+        AppointmentResponse appointment = new AppointmentResponse();
+        appointment.setPatientUserId(10L);
+        appointment.setProviderId(3L); // Not 2L
+        when(appointmentClient.getAppointmentById(1L)).thenReturn(appointment);
+
+        assertThatThrownBy(() -> reviewService.createReview(request, 10L))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("does not belong to selected provider");
+    }
+
+    @Test
     void deleteReview_admin_success() {
-        Review existing = Review.builder()
-                .reviewId(1L)
-                .appointmentId(1L)
-                .patientUserId(9L)
-                .providerId(3L)
-                .rating(4)
-                .comment("Old")
-                .build();
-        when(reviewRepository.findById(1L)).thenReturn(Optional.of(existing));
-        when(reviewRepository.calculateAverageRating(3L)).thenReturn(null);
+        Review review = Review.builder().reviewId(1L).patientUserId(20L).providerId(2L).build();
+        when(reviewRepository.findById(1L)).thenReturn(Optional.of(review));
+        
+        reviewService.deleteReview(1L, 10L, "ADMIN");
+        verify(reviewRepository).delete(review);
+    }
 
-        reviewService.deleteReview(1L, 77L, "ADMIN");
+    @Test
+    void createReview_missingAppointmentId_throwsException() {
+        request.setAppointmentId(null);
+        assertThatThrownBy(() -> reviewService.createReview(request, 10L))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Appointment id is required");
+    }
 
-        verify(reviewRepository).delete(existing);
-        verify(providerClient).updateProviderRating(3L, 0.0);
+    @Test
+    void createReview_missingProviderId_throwsException() {
+        request.setProviderId(null);
+        assertThatThrownBy(() -> reviewService.createReview(request, 10L))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Provider id is required");
     }
 }

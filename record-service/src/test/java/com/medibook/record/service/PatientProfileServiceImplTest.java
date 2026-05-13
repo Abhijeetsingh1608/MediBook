@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import com.medibook.record.dto.PatientProfileRequest;
 import com.medibook.record.entity.PatientProfile;
 import com.medibook.record.repository.PatientProfileRepository;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -76,5 +77,52 @@ class PatientProfileServiceImplTest {
         PatientProfile result = patientProfileService.getProfileByUserId(9L);
 
         assertThat(result.getFullName()).isEqualTo("Aditya");
+    }
+
+    @Test
+    @DisplayName("getAllProfiles: returns all profiles")
+    void getAllProfiles_success() {
+        when(patientProfileRepository.findAll()).thenReturn(List.of(new PatientProfile()));
+        List<PatientProfile> result = patientProfileService.getAllProfiles();
+        assertThat(result).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("updateProfile: success as owner")
+    void updateProfile_owner_success() {
+        PatientProfile profile = PatientProfile.builder().userId(9L).build();
+        when(patientProfileRepository.findByUserId(9L)).thenReturn(Optional.of(profile));
+        when(patientProfileRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        PatientProfile result = patientProfileService.updateProfile(9L, request, 9L, "PATIENT");
+        assertThat(result.getFullName()).isEqualTo("Aditya");
+    }
+
+    @Test
+    @DisplayName("updateProfile: success as admin")
+    void updateProfile_admin_success() {
+        PatientProfile profile = PatientProfile.builder().userId(9L).build();
+        when(patientProfileRepository.findByUserId(9L)).thenReturn(Optional.of(profile));
+        when(patientProfileRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        PatientProfile result = patientProfileService.updateProfile(9L, request, 1L, "ADMIN");
+        assertThat(result.getFullName()).isEqualTo("Aditya");
+    }
+
+    @Test
+    @DisplayName("getProfileByUserId: throws when not found")
+    void getProfileByUserId_notFound_throwsException() {
+        when(patientProfileRepository.findByUserId(99L)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> patientProfileService.getProfileByUserId(99L))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Patient profile not found");
+    }
+
+    @Test
+    @DisplayName("createProfile: throws when role is not patient")
+    void createProfile_nonPatientRole_throwsException() {
+        assertThatThrownBy(() -> patientProfileService.createProfile(request, 1L, "ADMIN"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Only patient users");
     }
 }

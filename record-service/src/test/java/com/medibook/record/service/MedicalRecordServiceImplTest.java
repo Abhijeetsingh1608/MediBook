@@ -107,4 +107,109 @@ class MedicalRecordServiceImplTest {
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("own medical records");
     }
+
+    @Test
+    void createMedicalRecord_alreadyExists_throwsException() {
+        when(medicalRecordRepository.existsByAppointmentId(1L)).thenReturn(true);
+        assertThatThrownBy(() -> medicalRecordService.createMedicalRecord(request, "PROVIDER"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("already exists");
+    }
+
+    @Test
+    void createMedicalRecord_appointmentNotFound_throwsException() {
+        when(medicalRecordRepository.existsByAppointmentId(1L)).thenReturn(false);
+        when(appointmentClient.getAppointmentById(1L)).thenReturn(null);
+        assertThatThrownBy(() -> medicalRecordService.createMedicalRecord(request, "PROVIDER"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("not found");
+    }
+
+    @Test
+    void updateMedicalRecord_success() {
+        MedicalRecord record = MedicalRecord.builder().recordId(1L).prescriptions(new java.util.ArrayList<>()).build();
+        when(medicalRecordRepository.findById(1L)).thenReturn(Optional.of(record));
+        when(medicalRecordRepository.save(any())).thenReturn(record);
+
+        MedicalRecord result = medicalRecordService.updateMedicalRecord(1L, request, "PROVIDER");
+        assertThat(result).isNotNull();
+        verify(medicalRecordRepository).save(any());
+    }
+
+    @Test
+    void deleteMedicalRecord_success() {
+        MedicalRecord record = MedicalRecord.builder().recordId(1L).build();
+        when(medicalRecordRepository.findById(1L)).thenReturn(Optional.of(record));
+        medicalRecordService.deleteMedicalRecord(1L, "ADMIN");
+        verify(medicalRecordRepository).delete(record);
+    }
+
+    @Test
+    void getRecordsByPatient_success() {
+        when(medicalRecordRepository.findByPatientUserId(9L)).thenReturn(List.of(new MedicalRecord()));
+        List<MedicalRecord> result = medicalRecordService.getRecordsByPatient(9L, 9L, "PATIENT");
+        assertThat(result).isNotEmpty();
+    }
+
+    @Test
+    @DisplayName("getAllMedicalRecords: returns all records")
+    void getAllMedicalRecords_success() {
+        when(medicalRecordRepository.findAll()).thenReturn(List.of(new MedicalRecord()));
+        List<MedicalRecord> result = medicalRecordService.getAllMedicalRecords();
+        assertThat(result).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("getRecordsByProvider: returns provider-specific records")
+    void getRecordsByProvider_success() {
+        when(medicalRecordRepository.findByProviderId(3L)).thenReturn(List.of(new MedicalRecord()));
+        List<MedicalRecord> result = medicalRecordService.getRecordsByProvider(3L);
+        assertThat(result).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("getMedicalRecordById: provider can view record")
+    void getMedicalRecordById_provider_success() {
+        MedicalRecord record = MedicalRecord.builder().recordId(1L).patientUserId(9L).build();
+        when(medicalRecordRepository.findById(1L)).thenReturn(Optional.of(record));
+        MedicalRecord result = medicalRecordService.getMedicalRecordById(1L, 3L, "PROVIDER");
+        assertThat(result).isNotNull();
+    }
+
+    @Test
+    @DisplayName("getRecordsByPatient: admin can view any patient record")
+    void getRecordsByPatient_admin_success() {
+        when(medicalRecordRepository.findByPatientUserId(9L)).thenReturn(List.of(new MedicalRecord()));
+        List<MedicalRecord> result = medicalRecordService.getRecordsByPatient(9L, 1L, "ADMIN");
+        assertThat(result).isNotEmpty();
+    }
+
+    @Test
+    @DisplayName("requireProviderOrAdmin: throws when role is patient for restricted operations")
+    void createMedicalRecord_unauthorizedRole_throwsException() {
+        assertThatThrownBy(() -> medicalRecordService.createMedicalRecord(request, "PATIENT"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Only provider or admin");
+    }
+
+    @Test
+    @DisplayName("findById: throws when record not found")
+    void getMedicalRecordById_notFound_throwsException() {
+        when(medicalRecordRepository.findById(99L)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> medicalRecordService.getMedicalRecordById(99L, 1L, "ADMIN"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Medical record not found");
+    }
+
+    @Test
+    @DisplayName("replacePrescriptions: handles null prescriptions list")
+    void createMedicalRecord_nullPrescriptions_success() {
+        request.setPrescriptions(null);
+        when(medicalRecordRepository.existsByAppointmentId(1L)).thenReturn(false);
+        when(appointmentClient.getAppointmentById(1L)).thenReturn(completedAppointment);
+        when(medicalRecordRepository.save(any(MedicalRecord.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        MedicalRecord result = medicalRecordService.createMedicalRecord(request, "PROVIDER");
+        assertThat(result.getPrescriptions()).isEmpty();
+    }
 }

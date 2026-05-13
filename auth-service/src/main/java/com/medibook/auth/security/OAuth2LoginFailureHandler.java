@@ -5,9 +5,11 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.stereotype.Component;
+import org.springframework.web.util.UriComponentsBuilder;
 
 @Component
 @Slf4j
@@ -16,6 +18,9 @@ import org.springframework.stereotype.Component;
  * It supports the working of this module in the project.
  */
 public class OAuth2LoginFailureHandler implements AuthenticationFailureHandler {
+
+    @Value("${app.oauth2.failure-redirect-url}")
+    private String failureRedirectUrl;
 
     @Override
 /*
@@ -29,6 +34,12 @@ public class OAuth2LoginFailureHandler implements AuthenticationFailureHandler {
 
         log.error("OAuth2 login failed", exception);
 
-        response.sendRedirect("/login?error");
+        String redirectUrl = UriComponentsBuilder.fromUriString(failureRedirectUrl)
+                .queryParam("error", "oauth2")
+                .queryParam("message", "Google login failed. Please try again.")
+                .build()
+                .toUriString();
+
+        response.sendRedirect(redirectUrl);
     }
 }

@@ -39,4 +39,8 @@ public interface AuthService {
     User changePassword(Long userId, String password);
 
     void deactivateUser(Long userId);
+
+    User activateUser(Long userId);
+
+    User updateUserRole(Long userId, UserRole role);
 }

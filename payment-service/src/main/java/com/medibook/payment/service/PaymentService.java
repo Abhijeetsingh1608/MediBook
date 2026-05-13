@@ -28,4 +28,6 @@ public interface PaymentService {
     List<Payment> getPaymentsByPatient(Long patientUserId, Long loggedInUserId, String role);
 
     List<Payment> getPaymentsByProvider(Long providerId);
+
+    byte[] generateInvoicePdf(Long paymentId, Long loggedInUserId, String role);
 }

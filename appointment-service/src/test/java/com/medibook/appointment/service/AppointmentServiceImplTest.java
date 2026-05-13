@@ -143,4 +143,86 @@ class AppointmentServiceImplTest {
         assertThat(result.getStatus()).isEqualTo(AppointmentStatus.BOOKED);
         verify(scheduleClient).updateSlotStatus(7L, "BOOKED");
     }
+
+    @Test
+    void bookAppointment_missingProvider_throwsException() {
+        request.setProviderId(null);
+        assertThatThrownBy(() -> appointmentService.bookAppointment(request, 9L))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Provider id is required");
+    }
+
+    @Test
+    void bookAppointment_missingSlot_throwsException() {
+        request.setSlotId(null);
+        assertThatThrownBy(() -> appointmentService.bookAppointment(request, 9L))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Slot id is required");
+    }
+
+    @Test
+    void cancelAppointment_alreadyCancelled_throwsException() {
+        Appointment appointment = Appointment.builder().status(AppointmentStatus.CANCELLED).patientUserId(9L).build();
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(appointment));
+        assertThatThrownBy(() -> appointmentService.cancelAppointment(1L, 9L, "PATIENT"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("already cancelled");
+    }
+
+    @Test
+    void completeAppointment_alreadyCancelled_throwsException() {
+        Appointment appointment = Appointment.builder().status(AppointmentStatus.CANCELLED).build();
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(appointment));
+        assertThatThrownBy(() -> appointmentService.completeAppointment(1L))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Cancelled appointment cannot be completed");
+    }
+
+    @Test
+    void getAllAppointments_success() {
+        when(appointmentRepository.findAll()).thenReturn(java.util.List.of(new Appointment()));
+        assertThat(appointmentService.getAllAppointments()).hasSize(1);
+    }
+
+    @Test
+    void getAppointmentsByPatient_success() {
+        when(appointmentRepository.findByPatientUserId(9L)).thenReturn(java.util.List.of(new Appointment()));
+        assertThat(appointmentService.getAppointmentsByPatient(9L)).hasSize(1);
+    }
+
+    @Test
+    void releaseFailedPaymentBooking_success() {
+        Appointment appointment = Appointment.builder().appointmentId(1L).slotId(7L).status(AppointmentStatus.BOOKED).build();
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(appointment));
+        when(appointmentRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        Appointment result = appointmentService.releaseFailedPaymentBooking(1L);
+        assertThat(result.getStatus()).isEqualTo(AppointmentStatus.CANCELLED);
+        verify(scheduleClient).updateSlotStatus(7L, "AVAILABLE");
+    }
+
+    @Test
+    void cancelAppointment_completed_throwsException() {
+        Appointment appointment = Appointment.builder().status(AppointmentStatus.COMPLETED).patientUserId(9L).build();
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(appointment));
+        assertThatThrownBy(() -> appointmentService.cancelAppointment(1L, 9L, "PATIENT"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Completed appointment cannot be cancelled");
+    }
+
+    @Test
+    void releaseFailedPaymentBooking_alreadyCancelled_returnsAppointment() {
+        Appointment appointment = Appointment.builder().status(AppointmentStatus.CANCELLED).build();
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(appointment));
+        Appointment result = appointmentService.releaseFailedPaymentBooking(1L);
+        assertThat(result).isEqualTo(appointment);
+    }
+
+    @Test
+    void activatePaidAppointment_alreadyCompleted_returnsAppointment() {
+        Appointment appointment = Appointment.builder().status(AppointmentStatus.COMPLETED).build();
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(appointment));
+        Appointment result = appointmentService.activatePaidAppointment(1L);
+        assertThat(result).isEqualTo(appointment);
+    }
 }

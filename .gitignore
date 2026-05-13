@@ -1,4 +1,12 @@
+############################
+# MAVEN / JAVA BUILD
+############################
 target/
+*.class
+*.jar
+*.war
+*.ear
+
 pom.xml.tag
 pom.xml.releaseBackup
 pom.xml.versionsBackup
@@ -6,14 +14,88 @@ pom.xml.next
 release.properties
 dependency-reduced-pom.xml
 buildNumber.properties
+
+############################
+# MAVEN WRAPPER
+############################
 .mvn/timing.properties
-# https://maven.apache.org/wrapper/#usage-without-binary-jar
 .mvn/wrapper/maven-wrapper.jar
 
-# Eclipse m2e generated files
-# Eclipse Core
+############################
+# IDE FILES
+############################
+.idea/
+.vscode/
 .project
-# JDT-specific (Eclipse Java Development Tools)
 .classpath
+.settings/
+.run/
+*.iml
+
+############################
+# ENV FILES (SECRETS)
+############################
 .env
-.idea
+.env.*
+!.env.example
+
+############################
+# LOGS & CRASH FILES
+############################
+logs/
+*.log
+hs_err_pid*
+replay_pid*
+
+############################
+# NODE / REACT
+############################
+node_modules/
+build/
+dist/
+.cache/
+
+############################
+# SONARQUBE
+############################
+.scannerwork/
+
+############################
+# TEST OUTPUT
+############################
+surefire-reports/
+test-output/
+coverage/
+
+############################
+# DOCKER
+############################
+.dockerignore
+
+############################
+# OS FILES
+############################
+.DS_Store
+Thumbs.db
+
+############################
+# TEMP FILES
+############################
+tmp/
+temp/
+*.swp
+*.swo
+
+############################
+# SECURITY
+############################
+*.key
+*.pem
+*.crt
+*.p12
+
+############################
+# LOCAL TEST FILES
+############################
+Test.java
+Test.class

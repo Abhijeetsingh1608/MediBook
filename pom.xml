@@ -32,6 +32,7 @@
 
         <spring.boot.version>4.0.5</spring.boot.version>
         <spring.cloud.version>2025.1.1</spring.cloud.version>
+        <spring-cloud.version>2025.1.1</spring-cloud.version>
 
         <!-- Use springdoc 3.x with Spring Boot 4.x -->
         <springdoc.version>3.0.1</springdoc.version>
@@ -53,7 +54,7 @@
             <dependency>
                 <groupId>org.springframework.cloud</groupId>
                 <artifactId>spring-cloud-dependencies</artifactId>
-                <version>${spring.cloud.version}</version>
+                <version>${spring-cloud.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -83,6 +84,7 @@
                     <version>3.13.0</version>
                     <configuration>
                         <release>${maven.compiler.release}</release>
+                        <parameters>true</parameters>
                     </configuration>
                 </plugin>
 

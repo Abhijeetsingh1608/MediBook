@@ -1,0 +1,15 @@
+app:
+  jwt:
+    secret: b4a2c8c6db5d3a336ea7619cb8b38b3e78fc69c97c09479d2833ce397ff60e88
+  internal:
+    secret: medibook-internal-secret
+  swagger:
+    services:
+      auth: http://localhost:8081
+      providers: http://localhost:8082
+      slots: http://localhost:8083
+      appointments: http://localhost:8084
+      reviews: http://localhost:8085
+      records: http://localhost:8086
+      notifications: http://localhost:8087
+      payments: http://localhost:8088

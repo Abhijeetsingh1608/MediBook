@@ -9,6 +9,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -106,6 +109,21 @@ public class PaymentController {
             @PathVariable Long paymentId,
             HttpServletRequest httpRequest) {
         return paymentService.getPaymentById(paymentId, getUserId(httpRequest), getRole(httpRequest));
+    }
+
+    @GetMapping("/{paymentId}/invoice")
+    public ResponseEntity<byte[]> downloadInvoice(
+            @PathVariable Long paymentId,
+            HttpServletRequest httpRequest) {
+        byte[] pdfBytes = paymentService.generateInvoicePdf(paymentId, getUserId(httpRequest), getRole(httpRequest));
+        
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDispositionFormData("attachment", "invoice-" + paymentId + ".pdf");
+        
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(pdfBytes);
     }
 
     @GetMapping("/patient/{patientUserId}")

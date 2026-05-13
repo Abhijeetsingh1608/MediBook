@@ -78,9 +78,13 @@ public class JwtService {
  * It keeps validation logic reusable and clean.
  */
     public boolean isTokenValid(String token, String username) {
-        String extractedUsername = extractUsername(token);
-        return extractedUsername.equals(username)
-                && !extractAllClaims(token).getExpiration().before(new Date());
+        try {
+            String extractedUsername = extractUsername(token);
+            return extractedUsername.equals(username)
+                    && !extractAllClaims(token).getExpiration().before(new Date());
+        } catch (Exception e) {
+            return false;
+        }
     }
 
 /*

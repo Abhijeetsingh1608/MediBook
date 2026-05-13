@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.medibook.auth.dto.RegisterRequest;
+import com.medibook.auth.entity.UserRole;
 
 
 @RestController
@@ -72,6 +74,7 @@ public class AuthController {
         authService.login(request);
         return ApiMessage.builder()
                 .message("Login OTP sent successfully to registered email")
+                .otpSent(true)
                 .build();
     }
 
@@ -168,6 +171,7 @@ public class AuthController {
      * This method fetches all records for this module.
      * It is mainly used when complete list data is needed on screen.
      */
+    @PreAuthorize("hasRole('ADMIN')")
     public List<User> getAllUsers() {
         return authService.getAllUsers();
     }
@@ -204,10 +208,27 @@ public class AuthController {
      * This method is part of the main flow of this class.
      * It helps complete one specific task of this module.
      */
+    @PreAuthorize("hasRole('ADMIN')")
     public ApiMessage deactivateUser(@PathVariable Long userId) {
         authService.deactivateUser(userId);
         return ApiMessage.builder()
                 .message("User deactivated successfully")
                 .build();
+    }
+
+    @PutMapping("/users/{userId}/activate")
+    @PreAuthorize("hasRole('ADMIN')")
+    public User activateUser(@PathVariable Long userId) {
+        return authService.activateUser(userId);
+    }
+
+    @PutMapping("/users/{userId}/role")
+    @PreAuthorize("hasRole('ADMIN')")
+    public User updateUserRole(@PathVariable Long userId, @RequestBody Map<String, String> request) {
+        String roleValue = request.get("role");
+        if (roleValue == null || roleValue.isBlank()) {
+            throw new RuntimeException("Role is required");
+        }
+        return authService.updateUserRole(userId, UserRole.valueOf(roleValue.trim().toUpperCase()));
     }
 }

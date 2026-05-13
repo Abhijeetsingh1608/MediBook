@@ -1,4 +1,9 @@
 package com.medibook.payment.service;
+
+import com.lowagie.text.Document;
+import com.lowagie.text.Paragraph;
+import com.lowagie.text.pdf.PdfWriter;
+import java.io.ByteArrayOutputStream;
 import com.medibook.payment.client.AppointmentClient;
 import com.medibook.payment.client.RazorpayClient;
 import com.medibook.payment.dto.AppointmentResponse;
@@ -346,5 +351,36 @@ public class PaymentServiceImpl implements PaymentService {
                         .startTime(appointment == null ? null : appointment.getStartTime())
                         .endTime(appointment == null ? null : appointment.getEndTime())
                         .build());
+    }
+
+    @Override
+    public byte[] generateInvoicePdf(Long paymentId, Long loggedInUserId, String role) {
+        Payment payment = getPaymentById(paymentId, loggedInUserId, role);
+
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            Document document = new Document();
+            PdfWriter.getInstance(document, baos);
+            document.open();
+
+            document.add(new Paragraph("Payment Invoice"));
+            document.add(new Paragraph("----------------------------------"));
+            document.add(new Paragraph("Payment ID: " + payment.getPaymentId()));
+            document.add(new Paragraph("Appointment ID: " + payment.getAppointmentId()));
+            document.add(new Paragraph("Patient ID: " + payment.getPatientUserId()));
+            document.add(new Paragraph("Provider ID: " + payment.getProviderId()));
+            document.add(new Paragraph("Amount: " + payment.getAmount() + " " + payment.getCurrency()));
+            document.add(new Paragraph("Status: " + payment.getStatus()));
+            if (payment.getRazorpayPaymentId() != null) {
+                document.add(new Paragraph("Transaction ID: " + payment.getRazorpayPaymentId()));
+            }
+            if (payment.getPaidAt() != null) {
+                document.add(new Paragraph("Paid At: " + payment.getPaidAt()));
+            }
+
+            document.close();
+            return baos.toByteArray();
+        } catch (Exception e) {
+            throw new RuntimeException("Error generating invoice PDF", e);
+        }
     }
 }
