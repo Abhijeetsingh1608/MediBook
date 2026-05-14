@@ -21,4 +21,5 @@ public class ProviderRequest {
     private String bio;
     private String clinicName;
     private String clinicAddress;
+    private String documentUrl; // Medical license / experience letter URL
 }

@@ -95,4 +95,10 @@ public interface ProviderService {
      * It is useful for summary cards or dashboard statistics.
      */
     long countBySpecialization(String specialization);
+
+    /*
+     * Rejects a provider with an optional admin note.
+     * Sets verified=false and stores the rejection reason.
+     */
+    Provider rejectProvider(Long providerId, String note);
 }

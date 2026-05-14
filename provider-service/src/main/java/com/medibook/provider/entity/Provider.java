@@ -63,6 +63,14 @@ public class Provider {
     @Column(nullable = false)
     private boolean available = true;
 
+    // URL of uploaded verification document (medical license / experience letter)
+    @Column(length = 1000)
+    private String documentUrl;
+
+    // Admin note when rejecting/verifying a provider
+    @Column(length = 500)
+    private String verificationNote;
+
     private LocalDateTime createdAt;
 
     @PrePersist

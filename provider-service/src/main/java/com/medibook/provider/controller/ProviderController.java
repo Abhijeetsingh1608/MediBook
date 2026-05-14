@@ -50,6 +50,7 @@ public class ProviderController {
                 .bio(request.getBio())
                 .clinicName(request.getClinicName())
                 .clinicAddress(request.getClinicAddress())
+                .documentUrl(request.getDocumentUrl())
                 .verified(false)
                 .available(true)
                 .build();
@@ -163,6 +164,19 @@ public class ProviderController {
             throw new RuntimeException("Only admin can approve provider profiles");
         }
         return providerService.updateVerificationStatus(providerId, verified);
+    }
+
+    @PutMapping("/{providerId}/reject")
+    @Operation(summary = "Admin rejects a provider with an optional note")
+    public Provider rejectProvider(
+            @PathVariable Long providerId,
+            @RequestParam(required = false) String note,
+            HttpServletRequest httpRequest) {
+        String role = httpRequest.getHeader("X-User-Role");
+        if (!"ADMIN".equalsIgnoreCase(role)) {
+            throw new RuntimeException("Only admin can reject provider profiles");
+        }
+        return providerService.rejectProvider(providerId, note);
     }
 
     @PutMapping("/{providerId}/availability")

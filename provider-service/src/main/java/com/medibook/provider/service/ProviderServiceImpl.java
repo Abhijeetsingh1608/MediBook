@@ -213,4 +213,13 @@ public class ProviderServiceImpl implements ProviderService {
     public long countBySpecialization(String specialization) {
         return providerRepository.countBySpecializationIgnoreCase(specialization);
     }
+
+    @Override
+    public Provider rejectProvider(Long providerId, String note) {
+        Provider provider = getProviderById(providerId);
+        provider.setVerified(false);
+        provider.setAvailable(false);
+        provider.setVerificationNote(note != null ? note : "Your profile was not approved by admin.");
+        return providerRepository.save(provider);
+    }
 }
