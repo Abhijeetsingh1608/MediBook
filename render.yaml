@@ -1,5 +1,5 @@
 services:
-  # 1. DATABASE (MySQL) - Private Service with Persistence
+  # --- INFRASTRUCTURE ---
   - type: worker
     name: medibook-db
     runtime: docker
@@ -11,16 +11,15 @@ services:
       sizeGB: 1
     envVars:
       - key: MYSQL_ROOT_PASSWORD
-        sync: false # Set this manually in Render dashboard for security
+        sync: false
       - key: MYSQL_DATABASE
         value: medibook_db
 
-  # 2. CACHE (Redis)
   - type: redis
     name: medibook-redis
     ipAllowList: [] 
 
-  # 3. SERVICE DISCOVERY (Eureka)
+  # --- CORE SERVICES ---
   - type: web
     name: eureka-server
     runtime: docker
@@ -28,8 +27,9 @@ services:
     envVars:
       - key: PORT
         value: 8761
+      - key: JAVA_OPTS
+        value: -Xmx192m -Xms128m
 
-  # 4. AUTH SERVICE
   - type: web
     name: auth-service
     runtime: docker
@@ -37,6 +37,8 @@ services:
     envVars:
       - key: PORT
         value: 8081
+      - key: JAVA_OPTS
+        value: -Xmx256m -Xms128m
       - key: MYSQL_HOST
         fromService:
           name: medibook-db
@@ -52,7 +54,6 @@ services:
       - key: INTERNAL_GATEWAY_SECRET
         generateValue: true
 
-  # 5. API GATEWAY
   - type: web
     name: api-gateway
     runtime: docker
@@ -60,6 +61,8 @@ services:
     envVars:
       - key: PORT
         value: 8080
+      - key: JAVA_OPTS
+        value: -Xmx256m -Xms128m
       - key: EUREKA_DEFAULT_ZONE
         value: http://eureka-server:8761/eureka
       - key: INTERNAL_GATEWAY_SECRET
