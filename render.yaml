@@ -1,0 +1,69 @@
+services:
+  # 1. DATABASE (MySQL) - Private Service with Persistence
+  - type: worker
+    name: medibook-db
+    runtime: docker
+    dockerContext: .
+    dockerfilePath: ./mysql.Dockerfile
+    disk:
+      name: mysql-data
+      mountPath: /var/lib/mysql
+      sizeGB: 1
+    envVars:
+      - key: MYSQL_ROOT_PASSWORD
+        sync: false # Set this manually in Render dashboard for security
+      - key: MYSQL_DATABASE
+        value: medibook_db
+
+  # 2. CACHE (Redis)
+  - type: redis
+    name: medibook-redis
+    ipAllowList: [] 
+
+  # 3. SERVICE DISCOVERY (Eureka)
+  - type: web
+    name: eureka-server
+    runtime: docker
+    dockerContext: ./eureka-server
+    envVars:
+      - key: PORT
+        value: 8761
+
+  # 4. AUTH SERVICE
+  - type: web
+    name: auth-service
+    runtime: docker
+    dockerContext: ./auth-service
+    envVars:
+      - key: PORT
+        value: 8081
+      - key: MYSQL_HOST
+        fromService:
+          name: medibook-db
+          type: host
+      - key: REDIS_HOST
+        fromService:
+          name: medibook-redis
+          type: host
+      - key: EUREKA_DEFAULT_ZONE
+        value: http://eureka-server:8761/eureka
+      - key: JWT_SECRET
+        generateValue: true
+      - key: INTERNAL_GATEWAY_SECRET
+        generateValue: true
+
+  # 5. API GATEWAY
+  - type: web
+    name: api-gateway
+    runtime: docker
+    dockerContext: ./api-gateway
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: EUREKA_DEFAULT_ZONE
+        value: http://eureka-server:8761/eureka
+      - key: INTERNAL_GATEWAY_SECRET
+        fromService:
+          name: auth-service
+          type: env
+          key: INTERNAL_GATEWAY_SECRET
