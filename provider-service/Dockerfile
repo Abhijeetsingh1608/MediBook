@@ -1,14 +1,8 @@
-FROM maven:3.9.11-eclipse-temurin-21 AS build
-WORKDIR /build
-
-COPY . .
-RUN mvn -pl provider-service -am clean package -DskipTests
-RUN cp "$(find /build/provider-service/target -maxdepth 1 -name '*.jar' ! -name '*.original' | head -n 1)" /tmp/app.jar
-
 FROM eclipse-temurin:21-jre
 WORKDIR /app
-COPY --from=build /tmp/app.jar /app/app.jar
-
-EXPOSE 8082
-
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+# Copy the JAR from the local target folder (built on host)
+COPY target/*.jar app.jar
+# Clean up potential multiple jars (if any) and keep only the executable one
+RUN if [ -f app.jar ]; then echo "JAR copied successfully"; else exit 1; fi
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "app.jar"]

@@ -58,6 +58,13 @@ public class ProviderController {
         return providerService.createProvider(provider);
     }
 
+    @GetMapping("/my-profile")
+    @Operation(summary = "Get provider profile for logged-in user")
+    public Provider getMyProfile(HttpServletRequest httpRequest) {
+        Long userId = Long.valueOf(httpRequest.getHeader("X-User-Id"));
+        return providerService.getProviderByUserId(userId);
+    }
+
     @GetMapping
     /*
      * This method fetches all records for this module.
@@ -146,7 +153,16 @@ public class ProviderController {
      * This method updates existing data with new values.
      * It is used when profile, status, or stored details need to change.
      */
-    public Provider updateProvider(@PathVariable Long providerId, @RequestBody Provider provider) {
+    public Provider updateProvider(@PathVariable Long providerId, @RequestBody com.medibook.provider.dto.ProviderRequest providerRequest) {
+        Provider provider = new Provider();
+        if (providerRequest.getFullName() != null) provider.setFullName(providerRequest.getFullName());
+        if (providerRequest.getSpecialization() != null) provider.setSpecialization(providerRequest.getSpecialization());
+        if (providerRequest.getQualification() != null) provider.setQualification(providerRequest.getQualification());
+        if (providerRequest.getExperienceYears() != null) provider.setExperienceYears(providerRequest.getExperienceYears());
+        if (providerRequest.getBio() != null) provider.setBio(providerRequest.getBio());
+        if (providerRequest.getClinicName() != null) provider.setClinicName(providerRequest.getClinicName());
+        if (providerRequest.getClinicAddress() != null) provider.setClinicAddress(providerRequest.getClinicAddress());
+        if (providerRequest.getDocumentUrl() != null) provider.setDocumentUrl(providerRequest.getDocumentUrl());
         return providerService.updateProvider(providerId, provider);
     }
 

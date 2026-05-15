@@ -1,4 +1,5 @@
 services:
+  # --- Infrastructure Services ---
   mysql:
     image: mysql:8.0
     container_name: medibook-mysql
@@ -21,9 +22,6 @@ services:
     image: redis:7-alpine
     container_name: medibook-redis
     restart: unless-stopped
-
-
-
     ports:
       - "6379:6379"
     healthcheck:
@@ -57,6 +55,185 @@ services:
     networks:
       - medibook-network
 
+  # --- MediBook Microservices ---
+  eureka-server:
+    image: medibook/eureka-server:latest
+    container_name: medibook-eureka
+    stop_grace_period: 30s
+    ports:
+      - "8761:8761"
+    environment:
+      - EUREKA_CLIENT_REGISTER_WITH_EUREKA=false
+      - EUREKA_CLIENT_FETCH_REGISTRY=false
+    networks:
+      - medibook-network
+
+  auth-service:
+    image: medibook/auth-service:latest
+    container_name: medibook-auth
+    stop_grace_period: 30s
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+    env_file: .env
+    environment:
+      - MYSQL_HOST=mysql
+      - REDIS_HOST=redis
+      - EUREKA_DEFAULT_ZONE=http://eureka-server:8761/eureka
+    ports:
+      - "8081:8081"
+    networks:
+      - medibook-network
+
+  provider-service:
+    image: medibook/provider-service:latest
+    container_name: medibook-provider
+    stop_grace_period: 30s
+    depends_on:
+      mysql:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+    env_file: .env
+    environment:
+      - MYSQL_HOST=mysql
+      - EUREKA_DEFAULT_ZONE=http://eureka-server:8761/eureka
+    ports:
+      - "8082:8082"
+    networks:
+      - medibook-network
+
+  schedule-service:
+    image: medibook/schedule-service:latest
+    container_name: medibook-schedule
+    stop_grace_period: 30s
+    depends_on:
+      mysql:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+    env_file: .env
+    environment:
+      - MYSQL_HOST=mysql
+      - EUREKA_DEFAULT_ZONE=http://eureka-server:8761/eureka
+    ports:
+      - "8083:8083"
+    networks:
+      - medibook-network
+
+  appointment-service:
+    image: medibook/appointment-service:latest
+    container_name: medibook-appointment
+    stop_grace_period: 30s
+    depends_on:
+      mysql:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+    env_file: .env
+    environment:
+      - MYSQL_HOST=mysql
+      - EUREKA_DEFAULT_ZONE=http://eureka-server:8761/eureka
+    ports:
+      - "8084:8084"
+    networks:
+      - medibook-network
+
+  review-service:
+    image: medibook/review-service:latest
+    container_name: medibook-review
+    stop_grace_period: 30s
+    depends_on:
+      mysql:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+    env_file: .env
+    environment:
+      - MYSQL_HOST=mysql
+      - EUREKA_DEFAULT_ZONE=http://eureka-server:8761/eureka
+    ports:
+      - "8085:8085"
+    networks:
+      - medibook-network
+
+  record-service:
+    image: medibook/record-service:latest
+    container_name: medibook-record
+    stop_grace_period: 30s
+    depends_on:
+      mysql:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+    env_file: .env
+    environment:
+      - MYSQL_HOST=mysql
+      - EUREKA_DEFAULT_ZONE=http://eureka-server:8761/eureka
+    ports:
+      - "8086:8086"
+    networks:
+      - medibook-network
+
+  notification-service:
+    image: medibook/notification-service:latest
+    container_name: medibook-notification
+    stop_grace_period: 30s
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+    env_file: .env
+    environment:
+      - MYSQL_HOST=mysql
+      - RABBITMQ_HOST=rabbitmq
+      - EUREKA_DEFAULT_ZONE=http://eureka-server:8761/eureka
+    ports:
+      - "8087:8087"
+    networks:
+      - medibook-network
+
+  payment-service:
+    image: medibook/payment-service:latest
+    container_name: medibook-payment
+    stop_grace_period: 30s
+    depends_on:
+      mysql:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+    env_file: .env
+    environment:
+      - MYSQL_HOST=mysql
+      - EUREKA_DEFAULT_ZONE=http://eureka-server:8761/eureka
+    ports:
+      - "8088:8088"
+    networks:
+      - medibook-network
+
+  api-gateway:
+    image: medibook/api-gateway:latest
+    container_name: medibook-gateway
+    stop_grace_period: 30s
+    depends_on:
+      eureka-server:
+        condition: service_started
+    env_file: .env
+    environment:
+      - EUREKA_DEFAULT_ZONE=http://eureka-server:8761/eureka
+    ports:
+      - "8080:8080"
+    networks:
+      - medibook-network
+
+  # --- Quality Assurance ---
   sonarqube-db:
     image: postgres:16-alpine
     container_name: medibook-sonarqube-db

@@ -20,6 +20,7 @@ public class GlobalExceptionHandler {
  * It helps complete one specific task of this module.
  */
     public Map<String, String> handleRuntimeException(RuntimeException ex) {
+        ex.printStackTrace();
         return Map.of("message", ex.getMessage());
     }
 
@@ -30,6 +31,7 @@ public class GlobalExceptionHandler {
  * It helps complete one specific task of this module.
  */
     public Map<String, String> handleException(Exception ex) {
+        ex.printStackTrace();
         return Map.of("message", "Something went wrong");
     }
 }

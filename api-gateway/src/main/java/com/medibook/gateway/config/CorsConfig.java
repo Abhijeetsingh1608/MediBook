@@ -24,7 +24,8 @@ public class CorsConfig implements WebMvcConfigurer {
                         "http://localhost:4174",
                         "http://127.0.0.1:4174",
                         "http://localhost:3000",
-                        "http://127.0.0.1:3000")
+                        "http://127.0.0.1:3000",
+                        "https://medibook-frontend.rho.vercel.app")
                 .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
                 .exposedHeaders("Authorization")

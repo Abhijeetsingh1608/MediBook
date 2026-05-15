@@ -137,13 +137,15 @@ public class ProviderServiceImpl implements ProviderService {
      */
     public Provider updateProvider(Long providerId, Provider provider) {
         Provider existingProvider = getProviderById(providerId);
-        existingProvider.setFullName(provider.getFullName());
-        existingProvider.setSpecialization(provider.getSpecialization());
-        existingProvider.setQualification(provider.getQualification());
-        existingProvider.setExperienceYears(provider.getExperienceYears());
-        existingProvider.setBio(provider.getBio());
-        existingProvider.setClinicName(provider.getClinicName());
-        existingProvider.setClinicAddress(provider.getClinicAddress());
+        // Null-safe partial update: only overwrite fields that are actually provided
+        if (provider.getFullName() != null) existingProvider.setFullName(provider.getFullName());
+        if (provider.getSpecialization() != null) existingProvider.setSpecialization(provider.getSpecialization());
+        if (provider.getQualification() != null) existingProvider.setQualification(provider.getQualification());
+        if (provider.getExperienceYears() != null) existingProvider.setExperienceYears(provider.getExperienceYears());
+        if (provider.getBio() != null) existingProvider.setBio(provider.getBio());
+        if (provider.getClinicName() != null) existingProvider.setClinicName(provider.getClinicName());
+        if (provider.getClinicAddress() != null) existingProvider.setClinicAddress(provider.getClinicAddress());
+        if (provider.getDocumentUrl() != null) existingProvider.setDocumentUrl(provider.getDocumentUrl());
         return providerRepository.save(existingProvider);
     }
 
