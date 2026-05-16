@@ -1,6 +1,6 @@
 services:
   # --- Infrastructure Services ---
-  # AWS RDS is used instead of a local container
+  # AWS RDS is used instead of a local MySQL container
 
   redis:
     image: redis:7-alpine
@@ -41,8 +41,9 @@ services:
 
   # --- MediBook Microservices ---
   eureka-server:
-    image: medibook/eureka-server:latest
+    image: 629054268853.dkr.ecr.ap-south-1.amazonaws.com/medibook/eureka-server:latest
     container_name: medibook-eureka
+    restart: unless-stopped
     stop_grace_period: 30s
     ports:
       - "8761:8761"
@@ -53,8 +54,9 @@ services:
       - medibook-network
 
   auth-service:
-    image: medibook/auth-service:latest
+    image: 629054268853.dkr.ecr.ap-south-1.amazonaws.com/medibook/auth-service:latest
     container_name: medibook-auth
+    restart: unless-stopped
     stop_grace_period: 30s
     depends_on:
       redis:
@@ -65,6 +67,7 @@ services:
     environment:
       - MYSQL_HOST=${MYSQL_HOST}
       - REDIS_HOST=redis
+      - RABBITMQ_HOST=rabbitmq
       - EUREKA_DEFAULT_ZONE=http://eureka-server:8761/eureka
     ports:
       - "8081:8081"
@@ -72,12 +75,15 @@ services:
       - medibook-network
 
   provider-service:
-    image: medibook/provider-service:latest
+    image: 629054268853.dkr.ecr.ap-south-1.amazonaws.com/medibook/provider-service:latest
     container_name: medibook-provider
+    restart: unless-stopped
     stop_grace_period: 30s
     depends_on:
       eureka-server:
         condition: service_started
+      rabbitmq:
+        condition: service_healthy
     env_file: .env
     environment:
       - MYSQL_HOST=${MYSQL_HOST}
@@ -89,8 +95,9 @@ services:
       - medibook-network
 
   schedule-service:
-    image: medibook/schedule-service:latest
+    image: 629054268853.dkr.ecr.ap-south-1.amazonaws.com/medibook/schedule-service:latest
     container_name: medibook-schedule
+    restart: unless-stopped
     stop_grace_period: 30s
     depends_on:
       eureka-server:
@@ -105,12 +112,15 @@ services:
       - medibook-network
 
   appointment-service:
-    image: medibook/appointment-service:latest
+    image: 629054268853.dkr.ecr.ap-south-1.amazonaws.com/medibook/appointment-service:latest
     container_name: medibook-appointment
+    restart: unless-stopped
     stop_grace_period: 30s
     depends_on:
       eureka-server:
         condition: service_started
+      rabbitmq:
+        condition: service_healthy
     env_file: .env
     environment:
       - MYSQL_HOST=${MYSQL_HOST}
@@ -122,8 +132,9 @@ services:
       - medibook-network
 
   review-service:
-    image: medibook/review-service:latest
+    image: 629054268853.dkr.ecr.ap-south-1.amazonaws.com/medibook/review-service:latest
     container_name: medibook-review
+    restart: unless-stopped
     stop_grace_period: 30s
     depends_on:
       eureka-server:
@@ -138,8 +149,9 @@ services:
       - medibook-network
 
   record-service:
-    image: medibook/record-service:latest
+    image: 629054268853.dkr.ecr.ap-south-1.amazonaws.com/medibook/record-service:latest
     container_name: medibook-record
+    restart: unless-stopped
     stop_grace_period: 30s
     depends_on:
       eureka-server:
@@ -154,8 +166,9 @@ services:
       - medibook-network
 
   notification-service:
-    image: medibook/notification-service:latest
+    image: 629054268853.dkr.ecr.ap-south-1.amazonaws.com/medibook/notification-service:latest
     container_name: medibook-notification
+    restart: unless-stopped
     stop_grace_period: 30s
     depends_on:
       rabbitmq:
@@ -173,12 +186,15 @@ services:
       - medibook-network
 
   payment-service:
-    image: medibook/payment-service:latest
+    image: 629054268853.dkr.ecr.ap-south-1.amazonaws.com/medibook/payment-service:latest
     container_name: medibook-payment
+    restart: unless-stopped
     stop_grace_period: 30s
     depends_on:
       eureka-server:
         condition: service_started
+      rabbitmq:
+        condition: service_healthy
     env_file: .env
     environment:
       - MYSQL_HOST=${MYSQL_HOST}
@@ -190,8 +206,9 @@ services:
       - medibook-network
 
   api-gateway:
-    image: medibook/api-gateway:latest
+    image: 629054268853.dkr.ecr.ap-south-1.amazonaws.com/medibook/api-gateway:latest
     container_name: medibook-gateway
+    restart: unless-stopped
     stop_grace_period: 30s
     depends_on:
       eureka-server:
@@ -204,56 +221,10 @@ services:
     networks:
       - medibook-network
 
-  # --- Quality Assurance ---
-  sonarqube-db:
-    image: postgres:16-alpine
-    container_name: medibook-sonarqube-db
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${SONARQUBE_DB_NAME}
-      POSTGRES_USER: ${SONARQUBE_DB_USER}
-      POSTGRES_PASSWORD: ${SONARQUBE_DB_PASSWORD}
-    volumes:
-      - sonarqube-postgres-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-    networks:
-      - quality-network
-
-  sonarqube:
-    image: sonarqube:lts-community
-    container_name: medibook-sonarqube
-    restart: unless-stopped
-    depends_on:
-      sonarqube-db:
-        condition: service_healthy
-    environment:
-      SONAR_JDBC_URL: jdbc:postgresql://sonarqube-db:5432/${SONARQUBE_DB_NAME}
-      SONAR_JDBC_USERNAME: ${SONARQUBE_DB_USER}
-      SONAR_JDBC_PASSWORD: ${SONARQUBE_DB_PASSWORD}
-    ports:
-      - "9000:9000"
-    volumes:
-      - sonarqube-data:/opt/sonarqube/data
-      - sonarqube-extensions:/opt/sonarqube/extensions
-      - sonarqube-logs:/opt/sonarqube/logs
-    networks:
-      - quality-network
-
 volumes:
   rabbitmq-data:
-  sonarqube-postgres-data:
-  sonarqube-data:
-  sonarqube-extensions:
-  sonarqube-logs:
 
 networks:
   medibook-network:
     name: medibook-network
-    driver: bridge
-  quality-network:
-    name: medibook-quality-network
     driver: bridge
