@@ -88,6 +88,7 @@ services:
     env_file: .env
     environment:
       - MYSQL_HOST=${MYSQL_HOST}
+      - SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=5
       - RABBITMQ_HOST=rabbitmq
       - EUREKA_DEFAULT_ZONE=http://eureka-server:8761/eureka
     ports:
@@ -106,6 +107,7 @@ services:
     env_file: .env
     environment:
       - MYSQL_HOST=${MYSQL_HOST}
+      - SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=5
       - EUREKA_DEFAULT_ZONE=http://eureka-server:8761/eureka
     ports:
       - "8083:8083"
@@ -125,6 +127,7 @@ services:
     env_file: .env
     environment:
       - MYSQL_HOST=${MYSQL_HOST}
+      - SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=5
       - RABBITMQ_HOST=rabbitmq
       - EUREKA_DEFAULT_ZONE=http://eureka-server:8761/eureka
     ports:
@@ -143,6 +146,7 @@ services:
     env_file: .env
     environment:
       - MYSQL_HOST=${MYSQL_HOST}
+      - SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=5
       - EUREKA_DEFAULT_ZONE=http://eureka-server:8761/eureka
     ports:
       - "8085:8085"
@@ -160,6 +164,7 @@ services:
     env_file: .env
     environment:
       - MYSQL_HOST=${MYSQL_HOST}
+      - SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=5
       - EUREKA_DEFAULT_ZONE=http://eureka-server:8761/eureka
     ports:
       - "8086:8086"
@@ -179,6 +184,7 @@ services:
     env_file: .env
     environment:
       - MYSQL_HOST=${MYSQL_HOST}
+      - SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=5
       - RABBITMQ_HOST=rabbitmq
       - EUREKA_DEFAULT_ZONE=http://eureka-server:8761/eureka
     ports:
@@ -199,6 +205,7 @@ services:
     env_file: .env
     environment:
       - MYSQL_HOST=${MYSQL_HOST}
+      - SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=5
       - RABBITMQ_HOST=rabbitmq
       - EUREKA_DEFAULT_ZONE=http://eureka-server:8761/eureka
     ports:
