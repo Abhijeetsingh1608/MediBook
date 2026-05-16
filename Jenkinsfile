@@ -1,32 +1,23 @@
 pipeline {
     agent any
-    
+
     tools {
         jdk 'jdk-17'
         maven 'maven-3'
     }
 
-    // ─────────────────────────────────────────────────────────
-    //  CONFIGURE THESE BEFORE RUNNING
-    //  1. Add AWS credentials in Jenkins → Manage Jenkins → Credentials
-    //     ID: "aws-credentials" (type: AWS Credentials)
-    //  2. Add SonarQube server in Jenkins → Manage Jenkins → Configure System
-    //     Name: "SonarQube" pointing to your SonarQube instance
-    //  3. Update AWS_REGION and ECS_CLUSTER below if different
-    // ─────────────────────────────────────────────────────────
-
     environment {
-        AWS_REGION      = 'ap-south-1'                          // ← Your AWS region (e.g. ap-south-1 for Mumbai)
-        ECS_CLUSTER     = 'medibook-cluster'                    // ← Your ECS cluster name
-        IMAGE_TAG       = "${env.BUILD_NUMBER}"                 // Each build gets unique tag
-        SONAR_PROJECT   = 'medibook'
+        AWS_REGION   = 'ap-south-1'
+        IMAGE_TAG    = "${env.BUILD_NUMBER}"
+        DEPLOY_DIR   = '/home/ubuntu/medibook'
     }
 
-    // List of all microservices
-    // Format: "folder-name:ecs-service-name"
-    // Update ECS service names to match what you create in AWS Console
     parameters {
-        string(name: 'SERVICES', defaultValue: 'eureka-server api-gateway auth-service provider-service schedule-service appointment-service review-service record-service notification-service payment-service', description: 'Space-separated list of services to build and deploy')
+        string(
+            name: 'SERVICES',
+            defaultValue: 'eureka-server api-gateway auth-service provider-service schedule-service appointment-service review-service record-service notification-service payment-service',
+            description: 'Space-separated list of services to build and deploy'
+        )
     }
 
     stages {
@@ -56,12 +47,10 @@ pipeline {
             }
             post {
                 always {
-                    // Publish JUnit test results
                     junit(
                         testResults: '**/target/surefire-reports/*.xml',
                         allowEmptyResults: true
                     )
-                    // Publish JaCoCo coverage reports
                     jacoco(
                         execPattern: '**/target/jacoco.exec',
                         classPattern: '**/target/classes',
@@ -71,16 +60,13 @@ pipeline {
             }
         }
 
-
-
         // ─────────────────────────────────────────────────────────
-        //  STAGE 5: DOCKER BUILD (all services in parallel)
+        //  STAGE 3: DOCKER BUILD (all services in parallel)
         // ─────────────────────────────────────────────────────────
         stage('Docker Build') {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
                     script {
-                        // Get AWS account ID dynamically
                         env.AWS_ACCOUNT_ID = sh(
                             script: "aws sts get-caller-identity --query Account --output text",
                             returnStdout: true
@@ -106,7 +92,6 @@ pipeline {
                             }
                         }
 
-                        // Build all services in parallel
                         parallel buildStages
                     }
                 }
@@ -114,13 +99,12 @@ pipeline {
         }
 
         // ─────────────────────────────────────────────────────────
-        //  STAGE 6: PUSH TO ECR
+        //  STAGE 4: PUSH TO ECR
         // ─────────────────────────────────────────────────────────
         stage('Push to ECR') {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
                     script {
-                        // Login to ECR
                         sh """
                             aws ecr get-login-password --region ${env.AWS_REGION} \
                                 | docker login --username AWS --password-stdin ${env.ECR_REGISTRY}
@@ -134,17 +118,16 @@ pipeline {
                             pushStages[svc] = {
                                 echo "Pushing image: ${svc}"
                                 sh """
-                                        # Auto-create the ECR repository if it does not exist
-                                        aws ecr describe-repositories --repository-names medibook/${svc} --region ${env.AWS_REGION} || \
-                                        aws ecr create-repository --repository-name medibook/${svc} --region ${env.AWS_REGION}
-                                        
-                                        docker push ${env.ECR_REGISTRY}/medibook/${svc}:${env.IMAGE_TAG}
-                                        docker push ${env.ECR_REGISTRY}/medibook/${svc}:latest
+                                    # Auto-create ECR repo if it doesn't exist
+                                    aws ecr describe-repositories --repository-names medibook/${svc} --region ${env.AWS_REGION} || \
+                                    aws ecr create-repository --repository-name medibook/${svc} --region ${env.AWS_REGION}
+
+                                    docker push ${env.ECR_REGISTRY}/medibook/${svc}:${env.IMAGE_TAG}
+                                    docker push ${env.ECR_REGISTRY}/medibook/${svc}:latest
                                 """
                             }
                         }
 
-                        // Push all images in parallel
                         parallel pushStages
                     }
                 }
@@ -152,56 +135,43 @@ pipeline {
         }
 
         // ─────────────────────────────────────────────────────────
-        //  STAGE 7: DEPLOY TO ECS
-        //  Deployment order matters — eureka first, gateway last
+        //  STAGE 5: DEPLOY TO EC2 via docker-compose
+        //  Jenkins runs on the same EC2, so we run docker compose directly
         // ─────────────────────────────────────────────────────────
-        stage('Deploy to ECS') {
-            when {
-                // Only deploy from main branch
-                branch 'main'
-            }
+        stage('Deploy to EC2') {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
-                    script {
-                        // Ordered deployment — DO NOT parallelize this
-                        def orderedServices = [
-                            'eureka-server',
-                            'auth-service',
-                            'provider-service',
-                            'schedule-service',
-                            'appointment-service',
-                            'review-service',
-                            'record-service',
-                            'notification-service',
-                            'payment-service',
-                            'api-gateway'   // api-gateway always last
-                        ]
+                    sh """
+                        # Setup deployment directory
+                        mkdir -p ${env.DEPLOY_DIR}
 
-                        orderedServices.each { svc ->
-                            echo "Deploying ${svc} to ECS..."
-                            sh """
-                                aws ecs update-service \
-                                    --cluster ${env.ECS_CLUSTER} \
-                                    --service ${svc} \
-                                    --force-new-deployment \
-                                    --region ${env.AWS_REGION}
-                            """
-                            // Wait for service to stabilize before deploying next
-                            sh """
-                                aws ecs wait services-stable \
-                                    --cluster ${env.ECS_CLUSTER} \
-                                    --services ${svc} \
-                                    --region ${env.AWS_REGION}
-                            """
-                            echo "${svc} deployed and stable ✅"
-                        }
-                    }
+                        # Copy docker-compose.yml to deployment directory
+                        cp ${env.WORKSPACE}/docker-compose.yml ${env.DEPLOY_DIR}/docker-compose.yml
+
+                        # Copy .env only if it doesn't already exist on EC2
+                        if [ ! -f ${env.DEPLOY_DIR}/.env ]; then
+                            echo "No .env found on EC2, copying from workspace..."
+                            cp ${env.WORKSPACE}/.env ${env.DEPLOY_DIR}/.env
+                        fi
+
+                        # Login to ECR
+                        aws ecr get-login-password --region ${env.AWS_REGION} \
+                            | docker login --username AWS --password-stdin ${env.ECR_REGISTRY}
+
+                        # Pull latest images and restart services
+                        cd ${env.DEPLOY_DIR}
+                        docker compose pull
+                        docker compose up -d --remove-orphans
+
+                        echo "=== Running Containers ==="
+                        docker compose ps
+                    """
                 }
             }
         }
 
         // ─────────────────────────────────────────────────────────
-        //  STAGE 8: CLEANUP (remove local images to save disk)
+        //  STAGE 6: CLEANUP (remove local build images to save disk)
         // ─────────────────────────────────────────────────────────
         stage('Cleanup') {
             steps {
@@ -211,38 +181,37 @@ pipeline {
                         def svc = service.trim()
                         sh """
                             docker rmi ${env.ECR_REGISTRY}/medibook/${svc}:${env.IMAGE_TAG} || true
-                            docker rmi ${env.ECR_REGISTRY}/medibook/${svc}:latest || true
                         """
                     }
+                    sh "docker image prune -f || true"
                 }
             }
         }
     }
 
     // ─────────────────────────────────────────────────────────
-    //  POST ACTIONS — Notifications after pipeline
+    //  POST ACTIONS
     // ─────────────────────────────────────────────────────────
     post {
         success {
             echo """
-            ╔══════════════════════════════════╗
-            ║  ✅ MediBook Deployment SUCCESS  ║
-            ║  Build: #${env.BUILD_NUMBER}     ║
-            ║  Branch: ${env.BRANCH_NAME}      ║
-            ╚══════════════════════════════════╝
+            ╔══════════════════════════════════════╗
+            ║  ✅ MediBook Deployment SUCCESS      ║
+            ║  Build: #${env.BUILD_NUMBER}         ║
+            ║  Branch: ${env.BRANCH_NAME}          ║
+            ╚══════════════════════════════════════╝
             """
         }
         failure {
             echo """
-            ╔══════════════════════════════════╗
-            ║  ❌ MediBook Deployment FAILED   ║
-            ║  Build: #${env.BUILD_NUMBER}     ║
-            ║  Check logs above for details    ║
-            ╚══════════════════════════════════╝
+            ╔══════════════════════════════════════╗
+            ║  ❌ MediBook Deployment FAILED       ║
+            ║  Build: #${env.BUILD_NUMBER}         ║
+            ║  Check logs above for details        ║
+            ╚══════════════════════════════════════╝
             """
         }
         always {
-            // Clean workspace after build
             cleanWs()
         }
     }
