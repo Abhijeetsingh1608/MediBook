@@ -134,8 +134,12 @@ pipeline {
                             pushStages[svc] = {
                                 echo "Pushing image: ${svc}"
                                 sh """
-                                    docker push ${env.ECR_REGISTRY}/medibook/${svc}:${env.IMAGE_TAG}
-                                    docker push ${env.ECR_REGISTRY}/medibook/${svc}:latest
+                                        # Auto-create the ECR repository if it does not exist
+                                        aws ecr describe-repositories --repository-names medibook/${svc} --region ${env.AWS_REGION} || \
+                                        aws ecr create-repository --repository-name medibook/${svc} --region ${env.AWS_REGION}
+                                        
+                                        docker push ${env.ECR_REGISTRY}/medibook/${svc}:${env.IMAGE_TAG}
+                                        docker push ${env.ECR_REGISTRY}/medibook/${svc}:latest
                                 """
                             }
                         }
