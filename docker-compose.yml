@@ -1,22 +1,6 @@
 services:
   # --- Infrastructure Services ---
-  mysql:
-    image: mysql:8.0
-    container_name: medibook-mysql
-    restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD}
-    ports:
-      - "3307:3306"
-    volumes:
-      - mysql-data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -p$$MYSQL_ROOT_PASSWORD || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-    networks:
-      - medibook-network
+  # AWS RDS is used instead of a local container
 
   redis:
     image: redis:7-alpine
@@ -73,15 +57,13 @@ services:
     container_name: medibook-auth
     stop_grace_period: 30s
     depends_on:
-      mysql:
-        condition: service_healthy
       redis:
         condition: service_healthy
       eureka-server:
         condition: service_started
     env_file: .env
     environment:
-      - MYSQL_HOST=mysql
+      - MYSQL_HOST=${MYSQL_HOST}
       - REDIS_HOST=redis
       - EUREKA_DEFAULT_ZONE=http://eureka-server:8761/eureka
     ports:
@@ -94,13 +76,12 @@ services:
     container_name: medibook-provider
     stop_grace_period: 30s
     depends_on:
-      mysql:
-        condition: service_healthy
       eureka-server:
         condition: service_started
     env_file: .env
     environment:
-      - MYSQL_HOST=mysql
+      - MYSQL_HOST=${MYSQL_HOST}
+      - RABBITMQ_HOST=rabbitmq
       - EUREKA_DEFAULT_ZONE=http://eureka-server:8761/eureka
     ports:
       - "8082:8082"
@@ -112,13 +93,11 @@ services:
     container_name: medibook-schedule
     stop_grace_period: 30s
     depends_on:
-      mysql:
-        condition: service_healthy
       eureka-server:
         condition: service_started
     env_file: .env
     environment:
-      - MYSQL_HOST=mysql
+      - MYSQL_HOST=${MYSQL_HOST}
       - EUREKA_DEFAULT_ZONE=http://eureka-server:8761/eureka
     ports:
       - "8083:8083"
@@ -130,13 +109,12 @@ services:
     container_name: medibook-appointment
     stop_grace_period: 30s
     depends_on:
-      mysql:
-        condition: service_healthy
       eureka-server:
         condition: service_started
     env_file: .env
     environment:
-      - MYSQL_HOST=mysql
+      - MYSQL_HOST=${MYSQL_HOST}
+      - RABBITMQ_HOST=rabbitmq
       - EUREKA_DEFAULT_ZONE=http://eureka-server:8761/eureka
     ports:
       - "8084:8084"
@@ -148,13 +126,11 @@ services:
     container_name: medibook-review
     stop_grace_period: 30s
     depends_on:
-      mysql:
-        condition: service_healthy
       eureka-server:
         condition: service_started
     env_file: .env
     environment:
-      - MYSQL_HOST=mysql
+      - MYSQL_HOST=${MYSQL_HOST}
       - EUREKA_DEFAULT_ZONE=http://eureka-server:8761/eureka
     ports:
       - "8085:8085"
@@ -166,13 +142,11 @@ services:
     container_name: medibook-record
     stop_grace_period: 30s
     depends_on:
-      mysql:
-        condition: service_healthy
       eureka-server:
         condition: service_started
     env_file: .env
     environment:
-      - MYSQL_HOST=mysql
+      - MYSQL_HOST=${MYSQL_HOST}
       - EUREKA_DEFAULT_ZONE=http://eureka-server:8761/eureka
     ports:
       - "8086:8086"
@@ -184,15 +158,13 @@ services:
     container_name: medibook-notification
     stop_grace_period: 30s
     depends_on:
-      mysql:
-        condition: service_healthy
       rabbitmq:
         condition: service_healthy
       eureka-server:
         condition: service_started
     env_file: .env
     environment:
-      - MYSQL_HOST=mysql
+      - MYSQL_HOST=${MYSQL_HOST}
       - RABBITMQ_HOST=rabbitmq
       - EUREKA_DEFAULT_ZONE=http://eureka-server:8761/eureka
     ports:
@@ -205,13 +177,12 @@ services:
     container_name: medibook-payment
     stop_grace_period: 30s
     depends_on:
-      mysql:
-        condition: service_healthy
       eureka-server:
         condition: service_started
     env_file: .env
     environment:
-      - MYSQL_HOST=mysql
+      - MYSQL_HOST=${MYSQL_HOST}
+      - RABBITMQ_HOST=rabbitmq
       - EUREKA_DEFAULT_ZONE=http://eureka-server:8761/eureka
     ports:
       - "8088:8088"
@@ -273,7 +244,6 @@ services:
       - quality-network
 
 volumes:
-  mysql-data:
   rabbitmq-data:
   sonarqube-postgres-data:
   sonarqube-data:

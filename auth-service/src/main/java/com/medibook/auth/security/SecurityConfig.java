@@ -1,5 +1,7 @@
 package com.medibook.auth.security;
 
+import com.medibook.auth.filter.InternalRequestFilter;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -42,6 +44,10 @@ public class SecurityConfig {
  * This repository object is used to interact with database.
  */
     private final ClientRegistrationRepository clientRegistrationRepository;
+/*
+ * This filter is used to validate internal service-to-service requests.
+ */
+    private final InternalRequestFilter internalRequestFilter;
 
 
     @Bean
@@ -85,6 +91,7 @@ public class SecurityConfig {
                         .failureHandler(oAuth2LoginFailureHandler))
                 .httpBasic(Customizer.withDefaults());
 
+        http.addFilterBefore(internalRequestFilter, UsernamePasswordAuthenticationFilter.class);
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }

@@ -1,5 +1,7 @@
 package com.medibook.notification.service;
 
+import lombok.extern.slf4j.Slf4j;
+
 import com.medibook.notification.client.AuthClient;
 import com.medibook.notification.client.ProviderClient;
 import com.medibook.notification.config.RabbitNotificationConfig;
@@ -18,6 +20,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class NotificationEventListener {
 
     private final NotificationService notificationService;
@@ -113,10 +116,14 @@ public class NotificationEventListener {
 
     @RabbitListener(queues = RabbitNotificationConfig.PROVIDER_APPROVAL_REQUESTED_QUEUE)
     public void handleProviderApprovalRequested(ProviderApprovalRequestedEvent event) {
+        log.info("Received provider approval request for provider: {}", event.getProviderId());
         List<UserSummary> admins = authClient.getUsersByRole("ADMIN");
         if (admins.isEmpty()) {
+            log.warn("No admins found to notify for provider approval request!");
             return;
         }
+
+        log.info("Found {} admins to notify", admins.size());
 
         String subject = "New provider approval request";
         String message = String.format(
@@ -131,8 +138,10 @@ public class NotificationEventListener {
 
         for (UserSummary admin : admins) {
             if (admin.getEmail() == null || admin.getEmail().isBlank()) {
+                log.warn("Admin {} has no email address", admin.getUserId());
                 continue;
             }
+            log.info("Sending approval notification email to admin: {}", admin.getEmail());
             notificationService.sendEmail(EmailNotificationRequest.builder()
                     .userId(admin.getUserId())
                     .recipientEmail(admin.getEmail())
