@@ -101,7 +101,7 @@ pipeline {
                                         -t ${env.ECR_REGISTRY}/medibook/${svc}:${env.IMAGE_TAG} \
                                         -t ${env.ECR_REGISTRY}/medibook/${svc}:latest \
                                         -f ${svc}/Dockerfile \
-                                        .
+                                        ${svc}
                                 """
                             }
                         }
