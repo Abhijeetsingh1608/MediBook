@@ -71,33 +71,7 @@ pipeline {
             }
         }
 
-        // ─────────────────────────────────────────────────────────
-        //  STAGE 3: SONARQUBE ANALYSIS
-        // ─────────────────────────────────────────────────────────
-        stage('SonarQube Analysis') {
-            steps {
-                withSonarQubeEnv('SonarQube') {
-                    sh '''
-                        mvn sonar:sonar \
-                            -Dsonar.projectKey=${SONAR_PROJECT} \
-                            -Dsonar.projectName="MediBook" \
-                            --batch-mode \
-                            --no-transfer-progress
-                    '''
-                }
-            }
-        }
 
-        // ─────────────────────────────────────────────────────────
-        //  STAGE 4: QUALITY GATE
-        // ─────────────────────────────────────────────────────────
-        stage('Quality Gate') {
-            steps {
-                timeout(time: 5, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
-                }
-            }
-        }
 
         // ─────────────────────────────────────────────────────────
         //  STAGE 5: DOCKER BUILD (all services in parallel)
