@@ -9,7 +9,7 @@ pipeline {
     environment {
         AWS_REGION   = 'ap-south-1'
         IMAGE_TAG    = "${env.BUILD_NUMBER}"
-        DEPLOY_DIR   = '/home/ubuntu/medibook'
+        DEPLOY_DIR   = '/var/lib/jenkins/medibook'
     }
 
     parameters {
