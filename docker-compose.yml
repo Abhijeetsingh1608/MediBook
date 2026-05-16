@@ -66,6 +66,7 @@ services:
     env_file: .env
     environment:
       - MYSQL_HOST=${MYSQL_HOST}
+      - SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=5
       - REDIS_HOST=redis
       - RABBITMQ_HOST=rabbitmq
       - EUREKA_DEFAULT_ZONE=http://eureka-server:8761/eureka
